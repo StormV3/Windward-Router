@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Windward Route & Navigation Optimizer</title>
+  <!-- Chart.js CDN for XY Scatter Plot -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    :root {
+      --bg-main: #0f172a;
+      --panel-bg: #1e293b;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-main);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      padding: 1.5rem;
+      gap: 1.5rem;
+    }
+
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1rem;
+    }
+
+    header h1 { font-size: 1.5rem; color: var(--accent); }
+    header p { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem; }
+
+    /* Glowing Flowing Yellow Animation for JitzKill */
+    .glowing-yellow-author {
+      font-weight: 700;
+      background: linear-gradient(
+        90deg, 
+        #fef08a, 
+        #eab308, 
+        #f59e0b, 
+        #fbbf24, 
+        #fef08a
+      );
+      background-size: 200% auto;
+      color: transparent;
+      -webkit-background-clip: text;
+      background-clip: text;
+      animation: flowingGlow 3s linear infinite;
+      filter: drop-shadow(0px 0px 6px rgba(250, 204, 21, 0.6));
+    }
+
+    @keyframes flowingGlow {
+      0% {
+        background-position: 0% center;
+      }
+      100% {
+        background-position: 200% center;
+      }
+    }
+
+    .grid-container {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 1.5rem;
+      flex: 1;
+    }
+
+    @media (max-width: 900px) {
+      .grid-container { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+    }
+
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .tab-btn {
+      background: var(--bg-main);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+      background: var(--border);
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .tab-content {
+      display: none;
+      flex: 1;
+      height: 100%;
+    }
+
+    .tab-content.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    label { font-size: 0.85rem; color: var(--text-muted); }
+
+    input, select {
+      background: var(--bg-main);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.6rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+
+    input:focus, select:focus {
+      outline: 1px solid var(--accent);
+    }
+
+    button.btn-primary {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 0.75rem;
+      font-weight: 600;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button.btn-primary:hover { background: var(--accent-hover); color: #fff; }
+
+    .wind-display {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-main);
+      padding: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    /* Compass Styling with Cardinal & Intercardinal Labels */
+    .compass {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 23, 42, 0.6);
+    }
+
+    .compass .cardinal-label {
+      position: absolute;
+      font-size: 0.6rem;
+      font-weight: bold;
+      color: var(--text-muted);
+      user-select: none;
+    }
+
+    .compass .label-n  { top: 2px; left: 50%; transform: translateX(-50%); color: var(--accent); }
+    .compass .label-ne { top: 6px; right: 7px; font-size: 0.5rem; }
+    .compass .label-e  { right: 3px; top: 50%; transform: translateY(-50%); }
+    .compass .label-se { bottom: 6px; right: 7px; font-size: 0.5rem; }
+    .compass .label-s  { bottom: 2px; left: 50%; transform: translateX(-50%); }
+    .compass .label-sw { bottom: 6px; left: 7px; font-size: 0.5rem; }
+    .compass .label-w  { left: 3px; top: 50%; transform: translateY(-50%); }
+    .compass .label-nw { top: 6px; left: 7px; font-size: 0.5rem; }
+
+    .needle {
+      width: 4px;
+      height: 28px;
+      background: #ef4444;
+      position: absolute;
+      transform-origin: bottom center;
+      top: 4px;
+      border-radius: 2px;
+      transition: transform 0.3s ease;
+      z-index: 2;
+    }
+
+    .needle::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+
+    .table-wrapper {
+      overflow-y: auto;
+      max-height: 600px;
+    }
+
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    .results-table th, .results-table td {
+      padding: 0.65rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .results-table th {
+      color: var(--text-muted);
+      font-weight: 500;
+      position: sticky;
+      top: 0;
+      background: var(--panel-bg);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    
+    .badge-valid { background: #0284c7; color: #fff; }
+    .badge-inefficient { background: #ef4444; color: #fff; }
+    
+    tr.inefficient-row { opacity: 0.75; }
+
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 580px;
+      background: var(--bg-main);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+    }
+
+    .anim-status-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(30, 41, 59, 0.95);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      z-index: 10;
+    }
+
+    .anim-status-panel strong { color: var(--accent); }
+
+    .status-alert { color: #ef4444; font-weight: bold; }
+
+    .btn-stop {
+      margin-top: 0.4rem;
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .btn-stop:hover { background: #dc2626; }
+
+    .suggested-wind {
+      font-size: 0.75rem;
+      color: #f59e0b;
+      margin-top: 0.15rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Windward Route & Navigation Optimizer</h1>
+    <p>Developed by <span class="glowing-yellow-author">JitzKill</span>, Co-developed by dylan6415</p>
+  </header>
+
+  <div class="grid-container">
+    <aside class="panel">
+      <div class="panel-title">Sailing & Wind Parameters</div>
+
+      <div class="form-group">
+        <label>Wind Bearing (° Angle)</label>
+        <input type="number" id="windInput" value="0" min="0" max="359" oninput="updateCompass()">
+      </div>
+
+      <div class="wind-display">
+        <div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">Wind Heading</div>
+          <strong id="windDegReadout">0° N</strong>
+        </div>
+        <div class="compass">
+          <span class="cardinal-label label-n">N</span>
+          <span class="cardinal-label label-ne">NE</span>
+          <span class="cardinal-label label-e">E</span>
+          <span class="cardinal-label label-se">SE</span>
+          <span class="cardinal-label label-s">S</span>
+          <span class="cardinal-label label-sw">SW</span>
+          <span class="cardinal-label label-w">W</span>
+          <span class="cardinal-label label-nw">NW</span>
+          <div class="needle" id="compassNeedle"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Ship Speed (Knots)</label>
+        <input type="number" id="shipSpeed" value="11" step="0.1" min="1">
+      </div>
+
+      <div class="form-group">
+        <label>Tonnage</label>
+        <select id="tonnageSelect" onchange="toggleCustomTonnage()">
+          <option value="36.7">Hoy (36.7 tons)</option>
+          <option value="67.2">Alert (67.2 tons)</option>
+          <option value="202">Ontario (202 tons)</option>
+          <option value="230" selected>Prince (230 tons)</option>
+          <option value="custom">Custom Tonnage</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="customTonnageGroup" style="display: none;">
+        <label>Custom Tonnage Value (tons)</label>
+        <input type="number" id="customTonnageInput" value="100" step="0.1" min="0.1">
+      </div>
+
+      <div class="form-group">
+        <label>Origin Port</label>
+        <select id="originIsland" onchange="stopShipAnimation(); renderGraph();"></select>
+      </div>
+
+      <button class="btn-primary" onclick="calculateRoutes()">Calculate Routes</button>
+    </aside>
+
+    <main class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Navigation Dashboard</div>
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchTab('table-tab', this)">Route Table</button>
+          <button class="tab-btn" onclick="switchTab('graph-tab', this)">XY Graph (Map)</button>
+        </div>
+      </div>
+      
+      <!-- TAB 1: Route Table -->
+      <div id="table-tab" class="tab-content active">
+        <div class="table-wrapper">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th>Destination</th>
+                <th>Distance</th>
+                <th>Departure Bearing</th>
+                <th>Status</th>
+                <th>Est. Time</th>
+                <th>Est. Profit</th>
+              </tr>
+            </thead>
+            <tbody id="resultsBody">
+              <tr>
+                <td colspan="6" style="text-align:center; color: var(--text-muted);">Select an origin port and click calculate.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 2: Visual XY Graph -->
+      <div id="graph-tab" class="tab-content">
+        <div class="chart-container">
+          <div id="animStatus" class="anim-status-panel" style="display: none;">
+            <div>Voyage: <strong id="animTargetName">--</strong></div>
+            <div>Time Left: <span id="animTimeLeft">0.0s</span></div>
+            <div id="animWindStatus">Wind: 0°</div>
+            <button class="btn-stop" onclick="stopShipAnimation()">Stop Voyage</button>
+          </div>
+          <canvas id="xyChart"></canvas>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    const RAW_MAP_DATA = {
+      "categories": [
+        {"id": "1", "name": "French Port"}, {"id": "2", "name": "French Fort"},
+        {"id": "3", "name": "Royal Navy Port"}, {"id": "4", "name": "Royal Navy Fort"},
+        {"id": "5", "name": "Spanish Port"}, {"id": "6", "name": "Spanish Fort"},
+        {"id": "7", "name": "Pirate Port"}, {"id": "8", "name": "Pirate Fort"},
+        {"id": "9", "name": "USN Port"}, {"id": "10", "name": "USN Fort"},
+        {"id": "11", "name": "Austria Port"}, {"id": "12", "name": "Austria Fort"},
+        {"id": "13", "name": "Portugal Port"}, {"id": "14", "name": "Portugal Fort"},
+        {"id": "15", "name": "Andouran Port"}, {"id": "16", "name": "Andouran Fort"},
+        {"id": "17", "name": "Region"}, {"id": "18", "name": "Neutral Port"},
+        {"id": "19", "name": "Neutral Fort"}
+      ],
+      "markers": [
+        {"categoryId": "13", "position": [126.875, 54.25], "popup": {"title": "Ponta Delgada"}},
+        {"categoryId": "14", "position": [137.28, 204.75], "popup": {"title": "Fortaleza de Santo Antao"}},
+        {"categoryId": "14", "position": [159.22, 104.19], "popup": {"title": "Forte de Santa Cruz"}},
+        {"categoryId": "13", "position": [109.22, 143.13], "popup": {"title": "Sao Bento"}},
+        {"categoryId": "13", "position": [31.03, 161.72], "popup": {"title": "Madalena"}},
+        {"categoryId": "13", "position": [90.50, 235.64], "popup": {"title": "Caveira"}},
+        {"categoryId": "6", "position": [130.12, 349.12], "popup": {"title": "Castillo de San Lorenzo"}},
+        {"categoryId": "5", "position": [149, 363.87], "popup": {"title": "Puerto de San Fernando"}},
+        {"categoryId": "5", "position": [72.25, 449.12], "popup": {"title": "Santa Maria"}},
+        {"categoryId": "5", "position": [52.5, 437], "popup": {"title": "Poblado de San Julian"}},
+        {"categoryId": "6", "position": [65.5, 535], "popup": {"title": "San Felipe"}},
+        {"categoryId": "5", "position": [75.87, 546.62], "popup": {"title": "San Salvador"}},
+        {"categoryId": "11", "position": [117, 797.62], "popup": {"title": "Kandlerova"}},
+        {"categoryId": "11", "position": [160, 782.5], "popup": {"title": "San Polo"}},
+        {"categoryId": "12", "position": [171.87, 755.62], "popup": {"title": "Fort Sirenik"}},
+        {"categoryId": "12", "position": [214.5, 753.75], "popup": {"title": "Forte di Settia"}},
+        {"categoryId": "11", "position": [263.62, 775.12], "popup": {"title": "La Poveglia"}},
+        {"categoryId": "11", "position": [275.62, 693.37], "popup": {"title": "San Vito"}},
+        {"categoryId": "11", "position": [331.42, 612.73], "popup": {"title": "Mako's Lookout"}},
+        {"categoryId": "11", "position": [324.62, 576.5], "popup": {"title": "Lord Irving's Sacrifice"}},
+        {"categoryId": "12", "position": [268.12, 603.5], "popup": {"title": "Deadman's Bastion"}},
+        {"categoryId": "15", "position": [303, 479.62], "popup": {"title": "Port Royal"}},
+        {"categoryId": "16", "position": [296.31, 438.78], "popup": {"title": "Fort George"}},
+        {"categoryId": "5", "position": [245.80, 408.97], "popup": {"title": "Theresa"}},
+        {"categoryId": "5", "position": [278.86, 364.69], "popup": {"title": "Port Antonio"}},
+        {"categoryId": "13", "position": [332.60, 362.56], "popup": {"title": "Falmouth"}},
+        {"categoryId": "1", "position": [447.75, 456], "popup": {"title": "Gory's Rock"}},
+        {"categoryId": "13", "position": [247.73, 241.98], "popup": {"title": "Venta Nueva"}},
+        {"categoryId": "13", "position": [295.21, 283.72], "popup": {"title": "Villarreal del Mar"}},
+        {"categoryId": "1", "position": [406.37, 280.75], "popup": {"title": "Point Rocheux"}},
+        {"categoryId": "1", "position": [454, 302.62], "popup": {"title": "Port-Au-Croix"}},
+        {"categoryId": "2", "position": [490.87, 312.37], "popup": {"title": "Fort Francis"}},
+        {"categoryId": "1", "position": [496.75, 330.87], "popup": {"title": "Pachard Town"}},
+        {"categoryId": "1", "position": [485.75, 145.5], "popup": {"title": "Louisbourg"}},
+        {"categoryId": "1", "position": [497.25, 187.87], "popup": {"title": "Maurepas"}},
+        {"categoryId": "2", "position": [538.5, 138], "popup": {"title": "Fort Roche"}},
+        {"categoryId": "2", "position": [503.25, 103.62], "popup": {"title": "Fort Cartier"}},
+        {"categoryId": "1", "position": [455, 97.75], "popup": {"title": "Sainte Rose"}},
+        {"categoryId": "1", "position": [534.12, 86.37], "popup": {"title": "Petit Anvers"}},
+        {"categoryId": "15", "position": [672.54, 186.23], "popup": {"title": "Crownstead"}},
+        {"categoryId": "16", "position": [680.14, 200.37], "popup": {"title": "Fort Alyxander"}},
+        {"categoryId": "15", "position": [734.24, 162.10], "popup": {"title": "Gyldenvale"}},
+        {"categoryId": "15", "position": [720.27, 223.62], "popup": {"title": "Wyntergard"}},
+        {"categoryId": "16", "position": [697.20, 240.59], "popup": {"title": "Fort Adler"}},
+        {"categoryId": "15", "position": [669.63, 222.20], "popup": {"title": "Ashbourne"}},
+        {"categoryId": "1", "position": [545.25, 331.75], "popup": {"title": "Matthew's Rest"}},
+        {"categoryId": "15", "position": [651.25, 346.75], "popup": {"title": "Fair Harbour"}},
+        {"categoryId": "1", "position": [672.37, 313], "popup": {"title": "Port Louis"}},
+        {"categoryId": "2", "position": [620.37, 317.12], "popup": {"title": "Ile Oubliee"}},
+        {"categoryId": "1", "position": [585.87, 346.87], "popup": {"title": "Buckey Bay"}},
+        {"categoryId": "2", "position": [586.25, 354.87], "popup": {"title": "Fort Jackson"}},
+        {"categoryId": "3", "position": [431.5, 639.25], "popup": {"title": "Belfry Heights"}},
+        {"categoryId": "3", "position": [472.78, 637.98], "popup": {"title": "Thresher Point"}},
+        {"categoryId": "4", "position": [492.32, 616.59], "popup": {"title": "Fort Acadia"}},
+        {"categoryId": "3", "position": [473.23, 572.84], "popup": {"title": "Caye Tiburon"}},
+        {"categoryId": "4", "position": [595.38, 585.13], "popup": {"title": "Fort Thomas"}},
+        {"categoryId": "9", "position": [679.61, 644.08], "popup": {"title": "Castle Landing"}},
+        {"categoryId": "9", "position": [649.56, 569.30], "popup": {"title": "Princeton"}},
+        {"categoryId": "18", "position": [597.50, 640.55], "popup": {"title": "Lebarde"}},
+        {"categoryId": "9", "position": [797.97, 580.18], "popup": {"title": "Jones' Outpost"}},
+        {"categoryId": "10", "position": [810.69, 596.62], "popup": {"title": "Fort Savannah"}},
+        {"categoryId": "9", "position": [828.37, 617.83], "popup": {"title": "Cumberland Hill"}},
+        {"categoryId": "10", "position": [806.98, 628.97], "popup": {"title": "Fort Perry"}},
+        {"categoryId": "9", "position": [811.22, 639.31], "popup": {"title": "New Catalina"}},
+        {"categoryId": "9", "position": [850.47, 666.71], "popup": {"title": "Sugar Cove"}},
+        {"categoryId": "7", "position": [588.62, 421.12], "popup": {"title": "Yorinobu's Settlement"}},
+        {"categoryId": "8", "position": [623.62, 472.87], "popup": {"title": "Fort Harrison"}},
+        {"categoryId": "7", "position": [581.37, 473.25], "popup": {"title": "New Brighton"}},
+        {"categoryId": "7", "position": [662.25, 473.87], "popup": {"title": "Al-Jazair"}},
+        {"categoryId": "7", "position": [687.66, 411.93], "popup": {"title": "Saint Vincent"}},
+        {"categoryId": "3", "position": [471.99, 772.33], "popup": {"title": "Peter's Cove"}},
+        {"categoryId": "4", "position": [495.85, 814.41], "popup": {"title": "Fort Lawrence"}},
+        {"categoryId": "3", "position": [489.31, 824.13], "popup": {"title": "Sandy Settlement"}},
+        {"categoryId": "3", "position": [514.59, 829.61], "popup": {"title": "Saint Nicolas"}},
+        {"categoryId": "4", "position": [587.34, 818.29], "popup": {"title": "Fort Saint Paul"}},
+        {"categoryId": "3", "position": [581.24, 799.20], "popup": {"title": "Taylor's Town"}},
+        {"categoryId": "7", "position": [794.94, 380.39], "popup": {"title": "Deadman's Murica"}},
+        {"categoryId": "7", "position": [835.37, 399.75], "popup": {"title": "Snake Prosper"}},
+        {"categoryId": "7", "position": [799.75, 419.75], "popup": {"title": "Caledonia"}},
+        {"categoryId": "7", "position": [780.87, 420.43], "popup": {"title": "Snakes Prosper"}},
+        {"categoryId": "8", "position": [796.50, 432.50], "popup": {"title": "Fort Dalton"}},
+        {"categoryId": "8", "position": [887.75, 404.25], "popup": {"title": "Fort Makser"}}
+      ]
+    };
+
+    let PORTS = [];
+    let ALL_LOCATIONS = [];
+    let chartInstance = null;
+    let animReqId = null;
+    let selectedDestPort = null;
+
+    const METERS_PER_UNIT = 20.66; 
+    const METERS_PER_MIN_PER_KNOT = 30.8667; 
+    const PROFIT_PER_METER_PER_TON = 4662 / (13403 * 230); 
+
+    function getCardinalDirection(angle) {
+      const normalized = (angle % 360 + 360) % 360;
+      if (normalized >= 337.5 || normalized < 22.5) return 'N';
+      if (normalized >= 22.5 && normalized < 67.5) return 'NE';
+      if (normalized >= 67.5 && normalized < 112.5) return 'E';
+      if (normalized >= 112.5 && normalized < 157.5) return 'SE';
+      if (normalized >= 157.5 && normalized < 202.5) return 'S';
+      if (normalized >= 202.5 && normalized < 247.5) return 'SW';
+      if (normalized >= 247.5 && normalized < 292.5) return 'W';
+      return 'NW';
+    }
+
+    function switchTab(tabId, btn) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      
+      document.getElementById(tabId).classList.add('active');
+      btn.classList.add('active');
+
+      if (tabId === 'graph-tab') {
+        renderGraph();
+      }
+    }
+
+    function updateCompass() {
+      const angle = parseFloat(document.getElementById('windInput').value) || 0;
+      const card = getCardinalDirection(angle);
+      document.getElementById('windDegReadout').innerText = `${Math.round(angle % 360)}° ${card}`;
+      document.getElementById('compassNeedle').style.transform = `rotate(${angle}deg)`;
+    }
+
+    function setWindAngle(angle) {
+      const normalizedAngle = (angle % 360 + 360) % 360;
+      document.getElementById('windInput').value = Math.round(normalizedAngle);
+      updateCompass();
+    }
+
+    function toggleCustomTonnage() {
+      const tonnageSelect = document.getElementById('tonnageSelect').value;
+      const customGroup = document.getElementById('customTonnageGroup');
+      customGroup.style.display = tonnageSelect === 'custom' ? 'flex' : 'none';
+    }
+
+    function getSelectedTonnage() {
+      const sel = document.getElementById('tonnageSelect').value;
+      return sel === 'custom' 
+        ? (parseFloat(document.getElementById('customTonnageInput').value) || 0)
+        : parseFloat(sel);
+    }
+
+    function initData() {
+      const categories = {};
+      RAW_MAP_DATA.categories.forEach(c => categories[c.id] = c.name);
+
+      RAW_MAP_DATA.markers.forEach(marker => {
+        const catName = categories[marker.categoryId] || "";
+        const item = {
+          name: marker.popup.title.trim(),
+          category: catName,
+          isPort: catName.includes("Port"),
+          isFort: catName.includes("Fort"),
+          x: marker.position[0],
+          y: marker.position[1]
+        };
+
+        ALL_LOCATIONS.push(item);
+
+        if (item.isPort) {
+          PORTS.push({
+            name: item.name,
+            faction: catName.replace(" Port", ""),
+            x: item.x,
+            y: item.y
+          });
+        }
+      });
+
+      PORTS.sort((a, b) => a.name.localeCompare(b.name));
+
+      const dropdown = document.getElementById('originIsland');
+      PORTS.forEach(port => {
+        const opt = document.createElement('option');
+        opt.value = port.name;
+        opt.textContent = `${port.name} (${port.faction})`;
+        dropdown.appendChild(opt);
+      });
+
+      dropdown.value = "Sainte Rose";
+      updateCompass();
+      calculateRoutes();
+    }
+
+    function calculateRoutes() {
+      const originName = document.getElementById('originIsland').value;
+      const baseSpeedKnots = parseFloat(document.getElementById('shipSpeed').value) || 11;
+      const tonnage = getSelectedTonnage();
+      const windAngle = parseFloat(document.getElementById('windInput').value) || 0;
+
+      const origin = PORTS.find(p => p.name === originName);
+      const resultsBody = document.getElementById('resultsBody');
+      resultsBody.innerHTML = '';
+
+      const routeData = [];
+      const metersPerMinute = baseSpeedKnots * METERS_PER_MIN_PER_KNOT;
+
+      PORTS.forEach(dest => {
+        if (dest.name === originName) return;
+
+        const dx = dest.x - origin.x;
+        const dy = dest.y - origin.y;
+        const coordDistance = Math.hypot(dx, dy);
+        const distanceMeters = coordDistance * METERS_PER_UNIT;
+
+        let directBearing = Math.atan2(dx, dy) * (180 / Math.PI);
+        if (directBearing < 0) directBearing += 360;
+
+        let diff = Math.abs(directBearing - windAngle) % 360;
+        if (diff > 180) diff = 360 - diff;
+
+        const isPossible = diff <= 110;
+
+        let suggestedWindAngle = (directBearing - 110 + 360) % 360;
+
+        if (isPossible) {
+          const travelTimeMin = distanceMeters / metersPerMinute;
+          const profit = distanceMeters * PROFIT_PER_METER_PER_TON * tonnage;
+
+          routeData.push({
+            name: dest.name,
+            distanceMeters: Math.round(distanceMeters),
+            bearing: Math.round(directBearing),
+            isPossible: true,
+            timeNum: travelTimeMin,
+            timeStr: travelTimeMin >= 60 
+              ? `${Math.floor(travelTimeMin/60)}h ${Math.round(travelTimeMin%60)}m` 
+              : `${travelTimeMin.toFixed(1)}m`,
+            profit: Math.round(profit),
+            suggestedWind: Math.round(suggestedWindAngle)
+          });
+        } else {
+          routeData.push({
+            name: dest.name,
+            distanceMeters: Math.round(distanceMeters),
+            bearing: Math.round(directBearing),
+            isPossible: false,
+            timeNum: Infinity,
+            timeStr: "--",
+            profit: 0,
+            suggestedWind: Math.round(suggestedWindAngle)
+          });
+        }
+      });
+
+      routeData.sort((a, b) => {
+        if (a.isPossible !== b.isPossible) return b.isPossible ? 1 : -1;
+        return a.timeNum - b.timeNum;
+      });
+
+      routeData.forEach(route => {
+        const row = document.createElement('tr');
+        if (!route.isPossible) row.classList.add('inefficient-row');
+        
+        let badgeHtml = '';
+        if (route.isPossible) {
+          badgeHtml = `<span class="badge badge-valid">Possible</span>`;
+        } else {
+          badgeHtml = `
+            <span class="badge badge-inefficient">Inefficient</span>
+            <div class="suggested-wind">Leave at: <strong>${route.suggestedWind}° (${getCardinalDirection(route.suggestedWind)})</strong></div>
+          `;
+        }
+
+        row.innerHTML = `
+          <td><strong>${route.name}</strong></td>
+          <td style="color: var(--text-muted);">${route.distanceMeters.toLocaleString()}m</td>
+          <td style="color: var(--accent); font-weight: bold;">${route.bearing}° (${getCardinalDirection(route.bearing)})</td>
+          <td>${badgeHtml}</td>
+          <td>${route.timeStr}</td>
+          <td style="color: ${route.isPossible ? '#4ade80' : 'var(--text-muted)'}; font-weight: bold;">
+            ${route.isPossible ? '$' + route.profit.toLocaleString() : '--'}
+          </td>
+        `;
+        resultsBody.appendChild(row);
+      });
+
+      if (document.getElementById('graph-tab').classList.contains('active')) {
+        renderGraph();
+      }
+    }
+
+    function stopShipAnimation() {
+      if (animReqId) {
+        cancelAnimationFrame(animReqId);
+        animReqId = null;
+      }
+      selectedDestPort = null;
+      document.getElementById('animStatus').style.display = 'none';
+      if (chartInstance) {
+        chartInstance.data.datasets[3].data = [];
+        chartInstance.data.datasets[4].data = [];
+        chartInstance.data.datasets[5].data = [];
+        chartInstance.update();
+      }
+    }
+
+    function isTargetInWindArc(currentX, currentY, targetX, targetY, currentWindBearing) {
+      const dx = targetX - currentX;
+      const dy = targetY - currentY;
+      
+      let bearingToTarget = Math.atan2(dx, dy) * (180 / Math.PI);
+      if (bearingToTarget < 0) bearingToTarget += 360;
+
+      let diff = Math.abs(bearingToTarget - (currentWindBearing % 360)) % 360;
+      if (diff > 180) diff = 360 - diff;
+
+      return diff <= 110;
+    }
+
+    function startShipAnimation(destLoc) {
+      stopShipAnimation();
+      selectedDestPort = destLoc;
+
+      const originName = document.getElementById('originIsland').value;
+      const originLoc = ALL_LOCATIONS.find(l => l.name === originName);
+      const baseSpeedKnots = parseFloat(document.getElementById('shipSpeed').value) || 11;
+      
+      const coordDist = Math.hypot(destLoc.x - originLoc.x, destLoc.y - originLoc.y);
+      const metersDist = coordDist * METERS_PER_UNIT;
+      const metersPerMin = baseSpeedKnots * METERS_PER_MIN_PER_KNOT;
+
+      const totalMinutes = metersDist / metersPerMin;
+      const durationMs = totalMinutes * 1000;
+      const initialWindBearing = parseFloat(document.getElementById('windInput').value) || 0;
+
+      const statusBox = document.getElementById('animStatus');
+      const targetNameEl = document.getElementById('animTargetName');
+      const timeLeftEl = document.getElementById('animTimeLeft');
+      const animWindStatusEl = document.getElementById('animWindStatus');
+      
+      statusBox.style.display = 'flex';
+      targetNameEl.innerText = destLoc.name;
+
+      chartInstance.data.datasets[3].data = [{ x: destLoc.x, y: destLoc.y, name: destLoc.name }];
+      chartInstance.data.datasets[4].borderColor = '#f59e0b';
+      chartInstance.data.datasets[4].data = [
+        { x: originLoc.x, y: originLoc.y },
+        { x: destLoc.x, y: destLoc.y }
+      ];
+
+      const startTime = performance.now();
+      let lastCheckedMinute = -1;
+
+      function animateStep(now) {
+        const elapsed = now - startTime;
+        let progress = elapsed / durationMs;
+        if (progress > 1) progress = 1;
+
+        const currentSimMinute = Math.floor(elapsed / 1000);
+        const currentWind = (initialWindBearing + (elapsed / 1000) * 6) % 360;
+
+        setWindAngle(currentWind);
+        animWindStatusEl.innerText = `Wind: ${Math.round(currentWind)}° (${getCardinalDirection(currentWind)})`;
+
+        const currX = originLoc.x + (destLoc.x - originLoc.x) * progress;
+        const currY = originLoc.y + (destLoc.y - originLoc.y) * progress;
+
+        if (currentSimMinute > lastCheckedMinute && progress < 1) {
+          lastCheckedMinute = currentSimMinute;
+
+          const windAtMinute = (initialWindBearing + currentSimMinute * 6) % 360;
+          const isValid = isTargetInWindArc(currX, currY, destLoc.x, destLoc.y, windAtMinute);
+
+          if (!isValid) {
+            timeLeftEl.innerHTML = `<span class="status-alert">Inefficient (Wind Shift!)</span>`;
+            chartInstance.data.datasets[4].borderColor = '#ef4444';
+            chartInstance.data.datasets[5].data = [{ x: currX, y: currY }];
+            chartInstance.update();
+            animReqId = null;
+            return;
+          }
+        }
+
+        if (progress >= 1) {
+          timeLeftEl.innerText = "Arrived!";
+          chartInstance.data.datasets[5].data = [{ x: destLoc.x, y: destLoc.y }];
+          chartInstance.update();
+          animReqId = null;
+          return;
+        }
+
+        const secondsLeft = ((durationMs - elapsed) / 1000).toFixed(1);
+        timeLeftEl.innerText = `${secondsLeft}s`;
+
+        chartInstance.data.datasets[5].data = [{ x: currX, y: currY }];
+        chartInstance.update('none');
+
+        animReqId = requestAnimationFrame(animateStep);
+      }
+
+      animReqId = requestAnimationFrame(animateStep);
+    }
+
+    function renderGraph() {
+      const originName = document.getElementById('originIsland').value;
+
+      const portsData = ALL_LOCATIONS
+        .filter(loc => loc.isPort && loc.name !== originName)
+        .map(loc => ({ x: loc.x, y: loc.y, name: loc.name, category: loc.category }));
+
+      const fortsData = ALL_LOCATIONS
+        .filter(loc => loc.isFort)
+        .map(loc => ({ x: loc.x, y: loc.y, name: loc.name, category: loc.category }));
+
+      const originLoc = ALL_LOCATIONS.find(loc => loc.name === originName);
+      const originData = originLoc ? [{ x: originLoc.x, y: originLoc.y, name: originLoc.name, category: "Origin Port" }] : [];
+
+      const ctx = document.getElementById('xyChart').getContext('2d');
+
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      chartInstance = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+          datasets: [
+            {
+              label: 'Selected Origin',
+              data: originData,
+              backgroundColor: '#22c55e',
+              pointRadius: 9,
+              pointHoverRadius: 11
+            },
+            {
+              label: 'Ports',
+              data: portsData,
+              backgroundColor: '#38bdf8',
+              pointRadius: 5,
+              pointHoverRadius: 8
+            },
+            {
+              label: 'Forts',
+              data: fortsData,
+              backgroundColor: '#ef4444',
+              pointRadius: 5,
+              pointHoverRadius: 8
+            },
+            {
+              label: 'Target Destination',
+              data: selectedDestPort ? [{ x: selectedDestPort.x, y: selectedDestPort.y, name: selectedDestPort.name }] : [],
+              backgroundColor: '#eab308',
+              pointRadius: 9,
+              pointHoverRadius: 11
+            },
+            {
+              label: 'Route Line',
+              type: 'line',
+              data: [],
+              borderColor: '#f59e0b',
+              borderWidth: 2,
+              borderDash: [5, 5],
+              pointRadius: 0,
+              showLine: true
+            },
+            {
+              label: 'Ship ⛵',
+              data: [],
+              backgroundColor: '#ffffff',
+              borderColor: '#38bdf8',
+              borderWidth: 2,
+              pointRadius: 8,
+              pointStyle: 'rectRot'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: (e, elements) => {
+            if (!elements || elements.length === 0) return;
+            const element = elements[0];
+            const datasetIndex = element.datasetIndex;
+
+            if (datasetIndex === 1) {
+              const clickedPoint = chartInstance.data.datasets[1].data[element.index];
+              const destLoc = ALL_LOCATIONS.find(l => l.name === clickedPoint.name);
+              if (destLoc) {
+                startShipAnimation(destLoc);
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              labels: { 
+                color: '#f8fafc',
+                filter: function(item) {
+                  return !['Target Destination', 'Route Line'].includes(item.text);
+                }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const point = context.raw;
+                  if (context.dataset.label === 'Ship ⛵') return `Voyage Ship Position`;
+                  return `${point.name || 'Location'} [X: ${point.x?.toFixed(1)}, Y: ${point.y?.toFixed(1)}]`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: 'X Position', color: '#94a3b8' },
+              grid: { color: '#334155' },
+              ticks: { color: '#f8fafc' }
+            },
+            y: {
+              title: { display: true, text: 'Y Position', color: '#94a3b8' },
+              grid: { color: '#334155' },
+              ticks: { color: '#f8fafc' }
+            }
+          }
+        }
+      });
+    }
+
+    window.onload = initData;
+  </script>
+</body>
+</html>
